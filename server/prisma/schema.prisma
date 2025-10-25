@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String         @id @default(uuid())
+  email               String         @unique
+  password            String?
+  name                String
+  verified            Boolean        @default(false)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  otps                Otp[]
+  sessions            Session[]
+  accounts            Account[]
+  boards              Board[]
+  memberships         Membership[]
+  items               Item[]
+  sentInvitations     Invitation[]   @relation("SentInvites")
+  receivedInvitations Invitation[]   @relation("ReceivedInvites")
+  notifications       Notification[]
+}
+
+model Account {
+  id         String   @id @default(uuid())
+  provider   Provider @default(LOCAL)
+  providerId String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId], name: "providerIdentity")
+}
+
+enum Provider {
+  LOCAL
+  GOOGLE
+}
+
+model Otp {
+  id         String     @id @default(uuid())
+  userId     String
+  code       String
+  purpose    OtpPurpose
+  attempts   Int        @default(0)
+  createdAt  DateTime   @default(now())
+  consumedAt DateTime?
+  expiresAt  DateTime
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum OtpPurpose {
+  SIGNUP
+}
+
+model Session {
+  id           String    @id @default(uuid())
+  userId       String
+  userAgent    String?
+  refreshToken String
+  createdAt    DateTime  @default(now())
+  rotatedAt    DateTime?
+  revokedAt    DateTime?
+  expiresAt    DateTime
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Board {
+  id          String       @id @default(uuid())
+  name        String
+  icon        String?
+  ownerId     String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  owner       User?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  memberships Membership[]
+  items       Item[]
+  invitations Invitation[]
+}
+
+model Membership {
+  boardId  String
+  memberId String
+  role     Role
+  board    Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  member   User   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([boardId, memberId], name: "id")
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  MEMBER
+}
+
+model Item {
+  id          String   @id @default(uuid())
+  type        ItemType
+  boardId     String
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  note        Note?
+}
+
+enum ItemType {
+  NOTE
+}
+
+model Note {
+  id      String @id
+  content String
+  item    Item   @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model Invitation {
+  id            String           @id @default(uuid())
+  status        InvitationStatus @default(PENDING)
+  boardId       String
+  senderId      String?
+  receiverId    String
+  createdAt     DateTime         @default(now())
+  respondedAt   DateTime?
+  deletedAt     DateTime?
+  board         Board            @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  sender        User?            @relation("SentInvites", fields: [senderId], references: [id], onDelete: SetNull)
+  receiver      User             @relation("ReceivedInvites", fields: [receiverId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  type         NotificationType
+  needsAction  Boolean?         @default(false)
+  payload      Json?
+  receiverId   String
+  invitationId String?
+  createdAt    DateTime         @default(now())
+  readAt       DateTime?
+  receiver     User             @relation(fields: [receiverId], references: [id], onDelete: Cascade)
+  invitation   Invitation?      @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationType {
+  INVITATION_RECEIVED
+}
