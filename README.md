@@ -72,7 +72,7 @@ To set up the project locally, follow these steps:
    - Run the Prisma migration to set up the database schema:
       ```bash
       cd server
-      npx prisma migrate dev --name init
+      npm run db:migrate dev --name init
       ```
 6. Run the app:
    - Start the server
